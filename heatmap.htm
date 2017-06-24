@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<style>
+			#divHeatmap {
+				width: 500px;
+				height: 500px;
+				left: 40%;
+				top: 40%;
+				border: 1px solid black;
+			}
+			text.mono {
+				font-size: 9pt;
+				font-family: Consolas;
+				fill: #aaa;
+			}
+			text.axis-workweek {
+				fill: #000;
+			}
+			text.axis-worktime {
+				fill: #000;
+			}
+			#divHeatMap {
+				width: 500px;
+				height: 500px;
+				position:absolute;
+				transform: rotateX(30deg) rotateY(45deg) translate3d(505px, -140px,0);
+			}
+		</style>
+		<script src="http://d3js.org/d3.v3.js"></script>
+	</head>
+	<body>
+		<div id="divHeatMap">
+		</div>
+		<script type="text/javascript">
+			var hmProperties = {
+					margin: {top: 25, right: 40, bottom: 0, left: 0},
+					right: 500,
+					bottom: 500
+				};
+			hmProperties.width = hmProperties.right - hmProperties.margin.right - hmProperties.margin.left;
+			hmProperties.height = hmProperties.bottom - hmProperties.margin.top - hmProperties.margin.bottom;
+			hmProperties.tile = {
+				width: Math.floor(hmProperties.width / 24),
+				height: Math.floor(hmProperties.height / 7)
+			};
+			var	dayLbl = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+				hrLbl = ["00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23"],
+				monLbl = ["Jan","Feb", "Mar", "Apr", "May", "Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+				colorStops = ["#000000","#0000FF","#00FFFF","#00FF00","#FFFF00","#FF0000","#FF00FF","#FFFFFF"]
+				;
+				
+			var heatmap = d3.select("#divHeatMap").append("svg")
+				.attr("width", hmProperties.right)
+				.attr("height",hmProperties.bottom)
+				.append("g")
+				.attr("transform","translate(" + hmProperties.margin.left + "," + hmProperties.margin.top + ")")
+				;
+			
+			var dayLabels = heatmap.selectAll(".day-label")
+				.data(dayLbl)
+				.enter()
+				.append("text")
+					.text(function(d){return d;})
+					.attr("x",hmProperties.right)
+					.attr("y",function(d,i){return i * hmProperties.tile.height;})
+					.style("text-anchor","end")
+					.attr("transform","translate(-5," + hmProperties.tile.height / 1.5 + ")")
+					.attr("class","day-label")
+				;
+			
+			var timeLabels = heatmap.selectAll(".time-label")
+				.data(hrLbl)
+				.enter()
+				.append("text")
+					.text(function(d) {return d;})
+					.attr("x",function(d,i){return i * hmProperties.tile.width;})
+					.attr("y",0)
+					.style("text-anchor","middle")
+					.attr("transform","translate(" + hmProperties.tile.width / 2 + ",0)")
+					.attr("class","time-label")
+				;
+				
+			var prepHeatmap = function(xsFile)  {
+				
+				d3.csv(xsFile,
+					function(d) {
+						return {
+							ccn: +d.CCN,
+							day: +d.Weekday,
+							hour: +d.Hour,
+							offense: +d.OFFENSE_Code,
+							id: d.Hour + ":" + d.Weekday,
+							
+						};
+					},
+					function(error, csvData) {
+						var summaryData = d3.nest()
+							.key(function (d) {return d.id;})
+							.rollup(function(v) {return v.length;})
+							.entries(csvData)
+							;
+						
+						var maxCrimes = d3.max(summaryData,function(d){return d.values;});
+						
+						console.log(maxCrimes);
+						
+						var tileData = [];
+						for (piDayHr=0; piDayHr < summaryData.length; piDayHr++) {
+							var paKey = summaryData[piDayHr].key.split(":");
+							tileData.push({"hour": +paKey[0], "day": +paKey[1], "count": +summaryData[piDayHr].values});
+						}
+
+						var colorScale = d3.scale.linear()
+							.domain([0,d3.max(summaryData,function(d){return d.values;})])
+							.range(16777216);
+						
+						var tiles = heatmap.selectAll(".tile")
+							.data(tileData)
+							.enter()
+							.append("rect")
+							.attr("x", function(d){return d.hour * hmProperties.tile.width;})
+							.attr("y", function(d){return (d.day - 1) * hmProperties.tile.height;})
+							.attr("class","tile")
+							.attr("width", hmProperties.tile.width)
+							.attr("height", hmProperties.tile.height)
+							.style("fill",function(d) {return colorScale8(d.count,maxCrimes);})
+							.append("title")
+								.text(function(d){return dayLbl[d.day - 1] + " @ " + hrLbl[d.hour] + ":00 = " + d.count;})
+							;
+					}
+				);
+			};
+			
+			function colorScale8(xdValue, xdMax) {
+				var pdPct = (xdValue / xdMax);
+				pnColorMax = 1791;
+				pdHeat = pdPct * pnColorMax;
+				if (pdHeat < 256) {
+					//  00 00 00 black ... 00 00 FF blue
+					return "#0000" + dec2hex(pdHeat);
+				} else if (pdHeat < 512) {
+					//	00 00 FF blue ... 00 FF FF cyan		256=0; 511=255
+					return "#00" + dec2hex(pdHeat - 256) + "FF";
+				} else if (pdHeat < 768) {
+					//	00 FF FF cyan ... 00 FF 00 green	512=255; 767=0
+					return "#00FF" + dec2hex(767 - pdHeat);
+				} else if (pdHeat < 1024) {
+					//	00 FF 00 green ... FF FF 00 yellow	768=0; 1023=255
+					return "#" + dec2hex(pdHeat - 768) + "FF00";
+				} else if (pdHeat < 1280) {
+					//	FF FF 00 yellow ... FF 00 00 red	1024=255; 1279=0
+					return "#FF" + dec2hex(1279 - pdHeat) + "00";
+				} else if (pdHeat < 1536) {
+					//	FF 00 00 red ... FF 00 FF magenta	1280=0; 1535=255
+					return "#FF00" + dec2hex(pdHeat - 1280);
+				} else {
+					//	FF 00 FF magenta ... FF FF FF  white	1536=0: 1791=255
+					return "#FF" + dec2hex(pdHeat - 1536) + "FF";
+				}
+			}
+
+			function dec2hex(xnDec) {
+				var pnDec = Math.floor(xnDec);
+				var psHex = ("0" + pnDec.toString(16)).slice(-2);
+				return psHex;
+			}
+
+			
+			prepHeatmap("DC_Crime_2015_Lab2.csv");
+		</script>
+	</body>
+</html>
