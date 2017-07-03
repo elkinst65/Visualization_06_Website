@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<!--
+	
+-->
+<html>
+	<head>
+		<style>
+			html, body {
+				font-family: Arial;
+			}
+			div {
+				position:	absolute;
+				border:		1px solid black;
+				padding:	0px;
+				margin:		0px;
+			}
+			
+			#divMain {
+				background-color: #FF9999;
+				width: 		500px;
+				height: 	500px;
+				left: 		0px;
+				top:		0px;
+				transform: 	translate3d(600px, 0,0);
+			}
+			#divHeatmap {
+				background-color: 	#FFFF99;
+				width: 		540px;
+				height: 	500px;
+				left: 		0px;
+				top:		0px;
+				transform:	rotateX(30deg) rotateY(45deg) translate3d(395px, -80px,0);
+			}
+			#divGeomap {
+				background-color: #99FF99;
+				width: 		622px;
+				height: 	765px;
+				left: 		0px;
+				top:		0px;
+				transform: 	rotateX(60deg) translate3d(120px,500px,0px);
+				background: #000000 url("PSA_Map.png") no-repeat;
+			}
+			#divStats {
+				background-color: #99FFFF;
+				width: 		500px;
+				height: 	500px;
+				left: 		0px;
+				top:		0px;
+				transform: 	rotateX(-30deg) rotateY(45deg) translate3d(-100px, 30px, 0);
+			}
+			.project-title {
+				font-size:		24pt;
+				color:			black;
+				text-align:		center;
+				width:			100%;
+			}
+			.data-count {
+				font-size:	12pt;
+				color:		black;
+				text-align:	center;
+				width:		100%;
+			}
+			#divMain p {
+				width: 		100%;
+				text-align:	center;
+			}
+			#divMain select {
+				margin-right: 30px;
+			}
+			.stats-svg {
+				left: 0px;
+				top: 0px;
+				width: 100%;
+				height: 50%;
+			}
+			.xCrime {
+				font-size: 10px;
+			}
+		</style>
+		<script src="lib/d3.min.js"></script>
+	</head>
+	<body>
+		<div id="divMain">
+			<h1></h1>
+			<h3></h3>
+			<p>
+				X axis: <select id="selXAxis"></select>    Y axis: <select id="selYAxis"></select>  <button onclick="BuildHeatmap()">Build</button>
+			</p>
+		</div>
+		<div id="divGeomap"></div>
+		<div id="divHeatmap"></div>
+		<div id="divStats"></div>
+		<script>
+			var dataFile = "DC_Crime_2015_IDX.csv";
+			var mainPanel = d3.select("#divMain");
+			var heatmapPanel = d3.select("#divHeatmap");
+			var dataCrime = [];			//	Holds our data outside the CSV parser
+			var crimeCounts;			//	Holds the counts of individual crime types for the heatmap
+			var summaryData;			
+			var plotFields = ["ANC","Day","District","Hour","Method","Month","Neighborhood","Offense","PSA","Shift","Type","VotingPrecinct","Ward","Weekday"];
+			var crimeColor = ["#9933FF","#0000FF","#00FFFF","#00FF00","#FFFF00","#FF8800","#FF0000","#FF00FF","#FFFFFF"];
+			var hmMargin = {top: 25, right: 40, bottom: 0, left: 0};
+			var brMargin = {top: 0, right: 0, bottom: 15, left: 40};
+			var barTicks = [10,30,50,70,90];
+			var axisLabels = {
+				"Shift": [],
+				"Offense": ["Thft/Othr","Thft/Auto","Burglary","Assault","Robbery","Vehicle","Homicide","Sex Crime","Arson"],
+				"Method": [],
+				"Type": [],
+				"Ward": [],
+				"ANC": [],
+				"Neighborhood": [],
+				"VotingPrecinct": [],
+				"PSA": [],
+				"District": [],
+				"Month": ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+				"Weekday": ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"],
+				"Hour": ["00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23"],
+				"Day": ["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31"]
+			};
+			var XField;
+			var YField;
+			
+			//	Add the project title
+			mainPanel.select("h1")
+				.attr("class","project-title")
+				.text("2015 DC Crime Data")
+			;
+			//	Add the data count
+			dataCount = mainPanel.select("h3")
+				.attr("class","data-count")
+			;
+			//	Populate the selector lists
+			mainPanel.select("#selXAxis").selectAll("option")
+				.data(plotFields)
+				.enter().append("option")
+				.attr("value",function(d){return d;})
+				.text(function(d){return d;})
+			;
+			mainPanel.select("#selXAxis").property("value","Hour");
+
+			mainPanel.select("#selYAxis").selectAll("option")
+				.data(plotFields)
+				.enter().append("option")
+				.attr("value",function(d){return d;})
+				.text(function(d){return d;})
+			;
+			mainPanel.select("#selYAxis").property("value","Weekday");
+
+			//	Add the Heatmap SVG
+			var heatmap = d3.select("#divHeatmap").append("svg")
+				.attr("width","100%")
+				.attr("height","100%")
+				.attr("class","heatmap-svg")
+			;
+				
+			var heatWidth = document.getElementById("divHeatmap").clientWidth - hmMargin.left - hmMargin.right;
+			var heatHeight = document.getElementById("divHeatmap").clientHeight - hmMargin.top - hmMargin.bottom;
+			
+			//	Add the bar chart SVG
+			var barChart = d3.select("#divStats").append("svg")
+				.attr("width","100%")
+				.attr("height","50%")
+				.attr("class","stats-svg")
+			;
+			
+			var statsWidth = document.getElementById("divStats").clientWidth - brMargin.left - brMargin.right;
+			var statsHeight = (document.getElementById("divStats").clientHeight / 2) - brMargin.top - brMargin.bottom;
+			var barWidth = Math.floor(statsWidth / 9);
+			var barYAxis = barChart.selectAll(".yPct")
+				.data([10,30,50,70,90])
+				.enter()
+				.append("text")
+					.text(function(d) {return d + "%";})
+					.attr("x",brMargin.left - 2)
+					.attr("y",function(d,i){return statsHeight - ((d/100) * statsHeight) + 5;})
+					.style("text-anchor","end")
+					.attr("class","yPct")
+				;
+			barChart.selectAll("line")
+				.data([10,30,50,70,90])
+				.enter()
+				.append("line")
+					.attr("x1", brMargin.left - 2)
+					.attr("x2", statsWidth + brMargin.left + brMargin.right)
+					.attr("y1", function(d,i){return statsHeight - ((d/100) * statsHeight);})
+					.attr("y2", function(d,i){return statsHeight - ((d/100) * statsHeight);})
+					.attr("stroke","#888")
+					.attr("stroke-width",1)
+			;
+			barChart.selectAll(".xCrime")
+				.data(axisLabels.Offense)
+				.enter()
+				.append("text")
+					.text(function(d) {return d;})
+					.attr("x",function(d,i){return brMargin.left + (barWidth * i) + (barWidth/2);})
+					.attr("y",statsHeight + brMargin.bottom - 5)
+					.style("text-anchor","middle")
+					.attr("class","xCrime")
+			
+			/*
+				Unfortunately, D3 loads the data asynchronously, so we can't access it external to the call to get it,
+				so everything has to be done inside this "function", which is a pain in the ...
+			*/
+			d3.csv(dataFile, function(data){
+				data.forEach(function(d){
+					axisLabels.Shift[+d.Shift_Idx] = d.Shift;
+					//axisLabels.Offense[+d.Offense_Idx] = d.Offense;
+					axisLabels.Method[+d.Method_Idx] = d.Method;
+					axisLabels.Type[+d.Type_Idx] = d.Type;
+					d.Ward_Idx = +d.Ward - 1;
+					axisLabels.Ward[d.Ward_Idx] = "Ward " + d.Ward;
+					axisLabels.ANC[+d.ANC_Idx] = d.ANC;
+					d.Neighborhood_Idx = +d.Neighborhood;
+					axisLabels.Neighborhood[d.Neighborhood_Idx] = d.Neighborhood;
+					d.VotingPrecinct_Idx = +d.VotingPrecinct;
+					axisLabels.VotingPrecinct[d.VotingPrecinct_Idx] = "Pct " + d.VotingPrecinct;
+					axisLabels.PSA[+d.PSA_Idx] = d.PSA;
+					d.District_Idx = +d.District - 1;
+					axisLabels.District[d.District_Idx] = "Dist " + d.District;
+					d.Month_Idx = +d.Month - 1;
+					d.Weekday_Idx = +d.Weekday - 1;
+					d.Hour_Idx = +d.Hour;
+					d.Day_Idx = +d.Day - 1;
+					
+					dataCrime.push(d);
+				});
+				dataCount.html(data.length + " records loaded from file <a href='" + dataFile + "'>" + dataFile + "</a>");
+				BuildHeatmap();
+			});
+			
+			
+			function BuildHeatmap() {
+				//	Remove the existing SVG heatmap
+				d3.select(".heatmap-svg").remove();
+				
+				//	Add a new heatmap SVG
+				heatmap = d3.select("#divHeatmap").append("svg")
+					.attr("width","100%")
+					.attr("height","100%")
+					.attr("class","heatmap-svg")
+				;
+				
+				//	Get the field names for the x and y axes
+				XField = document.getElementById("selXAxis").value;
+				YField = document.getElementById("selYAxis").value;
+				
+				
+				//	Calculate the number of tiles
+				var numXVals = d3.map(dataCrime, function(d) { return d[XField]; }).size();
+				var numYVals = d3.map(dataCrime, function(d) { return d[YField]; }).size();
+				
+				//	Calculate the tile size
+				var tileWidth = Math.floor(heatWidth / numXVals);
+				var tileHeight = Math.floor(heatHeight / numYVals);
+
+				//	Group the data by the selected fields, and count the number of crimes
+				summaryData = d3.nest()
+						.key(function(d) {return d[XField + "_Idx"] + ":" + d[YField + "_Idx"];})
+						.rollup(function (v) {return v.length;})
+						.entries(dataCrime)
+					;
+				var maxCrimes = d3.max(summaryData, function(d){return d.value;});
+				
+				//	Calculate the counts of offense type
+				crimeCounts = d3.nest()
+						.key(function(d) {return d[XField + "_Idx"] + ":" + d[YField + "_Idx"];})
+						.key(function(d) {return d.Offense_Idx;})
+						.rollup(function (v) {return v.length;})
+						.entries(dataCrime)
+					;
+
+				//	Adjust the color scale based on the max number of crimes
+				var colorScale = d3.scaleLinear()
+					.domain([0,maxCrimes/7,maxCrimes*2/7,maxCrimes*3/7,maxCrimes*4/7,maxCrimes*5/7,maxCrimes*6/7,maxCrimes])
+					.range(["#000000","#0000FF","#00FFFF","#00FF00","#FFFF00","#FF0000","#FF00FF","#FFFFFF"]);
+
+				//	Generate tiles
+				//var tiles = heatmap.selectAll("rect")
+				heatmap.selectAll("rect")
+					.data(summaryData)
+					.enter()
+					.append("rect")
+						.attr("x", function(d){return (+d.key.split(":")[0]) * tileWidth;})
+						.attr("y", function(d){return ((+d.key.split(":")[1]) * tileHeight) + hmMargin.top;})
+						.attr("class","tile")
+						.attr("width", tileWidth)
+						.attr("height", tileHeight)
+						.style("fill",function(d) {return colorScale(d.value);})
+						.on("mouseover",function(d) {d3.select(this).style("stroke","#000000").style("stroke-width",3); CrimeDistribution(d.key);})
+						.on("mouseout",function(d) {d3.select(this).style("stroke","none");})
+						.on("click",function(d) {HeatmapSelection(d.key);})
+						.append("title")
+							.text(function(d){return axisLabels[XField][+d.key.split(":")[0]] + " / " + axisLabels[YField][+d.key.split(":")[1]] + " = " + d.value;})
+					;
+				
+				var xLabels = heatmap.selectAll(".xLabel")
+					.data(axisLabels[XField])
+					.enter()
+					.append("text")
+						.text(function(d) {return d;})
+						.attr("x",function(d,i) {return (i * tileWidth)+(tileWidth / 2);})
+						.attr("y",hmMargin.top - 5)
+						.style("text-anchor","middle")
+						.attr("class","xLabel")
+				;
+				
+				var yLabels = heatmap.selectAll(".yLabel")
+					.data(axisLabels[YField])
+					.enter()
+					.append("text")
+						.text(function(d) {return d;})
+						.attr("x", heatWidth + hmMargin.right - 5)
+						.attr("y", function(d,i) {return hmMargin.top + (i * tileHeight) + (tileHeight / 2);})
+						.style("text-anchor","end")
+						.attr("class","yLabel")
+				;
+			}
+			
+			function CrimeDistribution(xsKey) {
+				var paIdx = xsKey.split(":");
+				var pnTotal = summaryData.filter(function(d) {return d.key == xsKey;})[0].value;
+				var paCrimes = crimeCounts.filter(function(d) {return d.key == xsKey;})[0];
+				
+				barChart.selectAll("rect").remove();
+				barChart.selectAll("text.barCount").remove();
+				
+				barChart.selectAll("rect")
+					.data(paCrimes.values)
+					.enter()
+					.append("rect")
+						.attr("x", function(d,i) {return (+d.key * barWidth) + brMargin.left + (0.05 * barWidth); })
+						.attr("y", function(d,i) {return statsHeight - ((d.value / pnTotal) * statsHeight);})
+						.attr("width", 0.9 * barWidth)
+						.attr("height",function(d,i) {return (d.value / pnTotal) * statsHeight;})
+						.attr("fill",function(d){return crimeColor[+d.key];})
+						.attr("class","crimeBar")
+				;
+				barChart.selectAll("text.barCount")
+					.data(paCrimes.values)
+					.enter()
+					.append("text")
+						.text(function(d){return d.value;})
+						.attr("x",function(d,i){return (+d.key * barWidth) + brMargin.left + (barWidth / 2);} )
+						.attr("y",statsHeight - 5)
+						.style("text-anchor","middle")
+						.attr("fill",function(d,i){return +d.key <= 1?"#FFFFFF":"#000000";})
+						.attr("class","barCount")
+				;
+			}
+			
+			function HeatmapSelection(xsKey){}
+			
+		</script>
+	</body>
+</html>
