@@ -1,22 +1,27 @@
 <!DOCTYPE html>
 <!--
+	MSDS 6391 - Project 6 & 7
+	Interactive Crime Data Display in D3
 	
+	Ben Brock
+	Austin Kelly
+	Tom Elkins
 -->
 <html>
 	<head>
 		<style>
 			html, body {
 				font-family: Arial;
+				background-color: #C3C3C3;	/* Use a neutral gray so the colors stand out more */
 			}
 			div {
 				position:	absolute;
-				border:		1px solid black;
+				border:		none;
 				padding:	0px;
 				margin:		0px;
 			}
-			
 			#divMain {
-				background-color: #FF9999;
+				background-color: #C3C3C3;
 				width: 		500px;
 				height: 	500px;
 				left: 		0px;
@@ -24,7 +29,7 @@
 				transform: 	translate3d(600px, 0,0);
 			}
 			#divHeatmap {
-				background-color: 	#FFFF99;
+				background-color: 	#C3C3C3;
 				width: 		540px;
 				height: 	500px;
 				left: 		0px;
@@ -32,16 +37,16 @@
 				transform:	rotateX(30deg) rotateY(45deg) translate3d(395px, -80px,0);
 			}
 			#divGeomap {
-				background-color: #99FF99;
+				background-color: #C3C3C3;
 				width: 		622px;
 				height: 	765px;
 				left: 		0px;
 				top:		0px;
 				transform: 	rotateX(60deg) translate3d(120px,500px,0px);
-				background: #000000 url("PSA_Map.png") no-repeat;
+				background: #000000 url("PSA_Map_gray.png") no-repeat;
 			}
 			#divStats {
-				background-color: #99FFFF;
+				background-color: #C3C3C3;
 				width: 		500px;
 				height: 	500px;
 				left: 		0px;
@@ -73,13 +78,29 @@
 				width: 100%;
 				height: 50%;
 			}
+			.stats-div {
+				left: 0px;
+				top: 50%;
+				width: 100%;
+				height: 50%;
+			}
+			.stats-div h4 {
+				margin-top: 25px;
+			}
 			.xCrime {
 				font-size: 10px;
+			}
+			#gui {
+				width: 100%;
+				height: 100%;
+				margin-left: 200px;
 			}
 		</style>
 		<script src="lib/d3.min.js"></script>
 	</head>
 	<body>
+		<div id="gui">
+		<!-- divMain gives the title and field selection -->
 		<div id="divMain">
 			<h1></h1>
 			<h3></h3>
@@ -87,21 +108,25 @@
 				X axis: <select id="selXAxis"></select>    Y axis: <select id="selYAxis"></select>  <button onclick="BuildHeatmap()">Build</button>
 			</p>
 		</div>
-		<div id="divGeomap"></div>
-		<div id="divHeatmap"></div>
-		<div id="divStats"></div>
+		<div id="divGeomap"></div>	<!-- divGeomap displays a map of DC so crime markers have some context -->
+		<div id="divHeatmap"></div>	<!-- divHeatmap displays the heatmap tiles -->
+		<div id="divStats"></div>	<!-- divStats displays the distribution of offense types as well as details of a selected crime -->
+		</div>
 		<script>
 			var dataFile = "DC_Crime_2015_IDX.csv";
-			var mainPanel = d3.select("#divMain");
-			var heatmapPanel = d3.select("#divHeatmap");
+			var mainPanel = d3.select("#divMain");			//	Keep a reference to the main panel so we can modify it dynamically
 			var dataCrime = [];			//	Holds our data outside the CSV parser
+			var tileData;				//	Holds the data aggregated for the heatmap tiles
 			var crimeCounts;			//	Holds the counts of individual crime types for the heatmap
-			var summaryData;			
+			
+			//	Names of the fields available for heatmap
 			var plotFields = ["ANC","Day","District","Hour","Method","Month","Neighborhood","Offense","PSA","Shift","Type","VotingPrecinct","Ward","Weekday"];
-			var crimeColor = ["#9933FF","#0000FF","#00FFFF","#00FF00","#FFFF00","#FF8800","#FF0000","#FF00FF","#FFFFFF"];
-			var hmMargin = {top: 25, right: 40, bottom: 0, left: 0};
-			var brMargin = {top: 0, right: 0, bottom: 15, left: 40};
-			var barTicks = [10,30,50,70,90];
+			var crimeColor = ["#9933FF","#0000FF","#00FFFF","#00FF00","#FFFF00","#FF8800","#FF0000","#FF00FF","#FFFFFF"];	// Color-coding the crime types
+			var hmMargin = {top: 25, right: 40, bottom: 0, left: 0};	//	Margins for the heatmap
+			var brMargin = {top: 0, right: 0, bottom: 15, left: 40};	//	Margins for the bar chart
+			var barTicks = [10,30,50,70,90];	//	Tick-marks/reference lines for the bar chart
+			
+			//	Set up an object with data-driven and constant axis labels for each of our plot fields
 			var axisLabels = {
 				"Shift": [],
 				"Offense": ["Thft/Othr","Thft/Auto","Burglary","Assault","Robbery","Vehicle","Homicide","Sex Crime","Arson"],
@@ -118,8 +143,9 @@
 				"Hour": ["00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23"],
 				"Day": ["1","2","3","4","5","6","7","8","9","10","11","12","13","14","15","16","17","18","19","20","21","22","23","24","25","26","27","28","29","30","31"]
 			};
-			var XField;
-			var YField;
+			var XField;		//	This will hold the name of the user-selected field for the X-axis
+			var YField;		//	This will hold the name of the user-selected field for the Y-axis
+			var ItemSelected = false;	//	Flag to indicate whether a heat-map tile has been selected (true) or not (false)
 			
 			//	Add the project title
 			mainPanel.select("h1")
@@ -137,7 +163,7 @@
 				.attr("value",function(d){return d;})
 				.text(function(d){return d;})
 			;
-			mainPanel.select("#selXAxis").property("value","Hour");
+			mainPanel.select("#selXAxis").property("value","Hour");		//	 Make "hour" the default X-axis selection
 
 			mainPanel.select("#selYAxis").selectAll("option")
 				.data(plotFields)
@@ -145,7 +171,7 @@
 				.attr("value",function(d){return d;})
 				.text(function(d){return d;})
 			;
-			mainPanel.select("#selYAxis").property("value","Weekday");
+			mainPanel.select("#selYAxis").property("value","Weekday");	//	Make "weekday" the default Y-axis selection
 
 			//	Add the Heatmap SVG
 			var heatmap = d3.select("#divHeatmap").append("svg")
@@ -153,7 +179,8 @@
 				.attr("height","100%")
 				.attr("class","heatmap-svg")
 			;
-				
+			
+			//	Set the display area for the tiles
 			var heatWidth = document.getElementById("divHeatmap").clientWidth - hmMargin.left - hmMargin.right;
 			var heatHeight = document.getElementById("divHeatmap").clientHeight - hmMargin.top - hmMargin.bottom;
 			
@@ -164,11 +191,21 @@
 				.attr("class","stats-svg")
 			;
 			
+			//	Add the crime info display area
+			var statsInfo = d3.select("#divStats").append("div")
+				.attr("width","100%")
+				.attr("height","50%")
+				.attr("class","stats-div")
+			;
+			
+			//	Set up the display area for the bar chart
 			var statsWidth = document.getElementById("divStats").clientWidth - brMargin.left - brMargin.right;
 			var statsHeight = (document.getElementById("divStats").clientHeight / 2) - brMargin.top - brMargin.bottom;
-			var barWidth = Math.floor(statsWidth / 9);
-			var barYAxis = barChart.selectAll(".yPct")
-				.data([10,30,50,70,90])
+			var barWidth = Math.floor(statsWidth / 9);	//	Static bar width since we are only displaying by crime types
+			
+			//	Set up the bar chart Y-axis labels
+			barChart.selectAll(".yPct")
+				.data(barTicks)
 				.enter()
 				.append("text")
 					.text(function(d) {return d + "%";})
@@ -177,8 +214,10 @@
 					.style("text-anchor","end")
 					.attr("class","yPct")
 				;
+
+			//	Draw the bar chart reference lines
 			barChart.selectAll("line")
-				.data([10,30,50,70,90])
+				.data(barTicks)
 				.enter()
 				.append("line")
 					.attr("x1", brMargin.left - 2)
@@ -188,6 +227,8 @@
 					.attr("stroke","#888")
 					.attr("stroke-width",1)
 			;
+			
+			//	Set up the bar chart X-axis labels (crime types)
 			barChart.selectAll(".xCrime")
 				.data(axisLabels.Offense)
 				.enter()
@@ -197,41 +238,67 @@
 					.attr("y",statsHeight + brMargin.bottom - 5)
 					.style("text-anchor","middle")
 					.attr("class","xCrime")
+			;
 			
-			/*
-				Unfortunately, D3 loads the data asynchronously, so we can't access it external to the call to get it,
-				so everything has to be done inside this "function", which is a pain in the ...
+			//	Add the SVG element to the geo map
+			var geoMap = d3.select("#divGeomap").append("svg")
+				.attr("width","100%")
+				.attr("height","100%")
+				.attr("class","geo-svg")
+			;
+			
+			//	Set up the X and Y scales based on latitude/longitude extents for DC
+			var mapXScale = d3.scaleLinear()
+				.domain([-77.12,-76.90917])
+				.range([0,document.getElementById("divGeomap").clientWidth])
+			;
+			
+			var mapYScale = d3.scaleLinear()
+				.domain([38.996,38.79167])
+				.range([0,document.getElementById("divGeomap").clientHeight])
+			;
+
+			/*	Load the CSV file, adjust some of the fields, add index fields, and push the records to a global array so we can
+				access it any time we want.
+				
+				Here, we create numeric index fields for all of our categorical fields.  This allows us to rely on the index fields
+				for aggregation functions.  We also populate the axis labels with the actual names from the data so we don't have
+				to type them in.  We can then query the axis labels using the index value to get the equivalent named value back.
 			*/
 			d3.csv(dataFile, function(data){
 				data.forEach(function(d){
-					axisLabels.Shift[+d.Shift_Idx] = d.Shift;
+					axisLabels.Shift[+d.Shift_Idx] = d.Shift;	//	Populate the Shift axis labels with the shift names matching the indices
 					//axisLabels.Offense[+d.Offense_Idx] = d.Offense;
-					axisLabels.Method[+d.Method_Idx] = d.Method;
-					axisLabels.Type[+d.Type_Idx] = d.Type;
-					d.Ward_Idx = +d.Ward - 1;
-					axisLabels.Ward[d.Ward_Idx] = "Ward " + d.Ward;
-					axisLabels.ANC[+d.ANC_Idx] = d.ANC;
-					d.Neighborhood_Idx = +d.Neighborhood;
-					axisLabels.Neighborhood[d.Neighborhood_Idx] = d.Neighborhood;
-					d.VotingPrecinct_Idx = +d.VotingPrecinct;
-					axisLabels.VotingPrecinct[d.VotingPrecinct_Idx] = "Pct " + d.VotingPrecinct;
-					axisLabels.PSA[+d.PSA_Idx] = d.PSA;
-					d.District_Idx = +d.District - 1;
-					axisLabels.District[d.District_Idx] = "Dist " + d.District;
-					d.Month_Idx = +d.Month - 1;
-					d.Weekday_Idx = +d.Weekday - 1;
-					d.Hour_Idx = +d.Hour;
-					d.Day_Idx = +d.Day - 1;
+					axisLabels.Method[+d.Method_Idx] = d.Method;	//	Populate the Method axis labels with the named methods
+					axisLabels.Type[+d.Type_Idx] = d.Type;		//	Populate the Type axis labels
+					d.Ward_Idx = +d.Ward - 1;	//	Create a Ward index field from the Ward ID
+					axisLabels.Ward[d.Ward_Idx] = "Ward " + d.Ward;	//	Populate the Ward axis labels
+					axisLabels.ANC[+d.ANC_Idx] = d.ANC;	//	Populate the ANC axis labels
+					d.Neighborhood_Idx = +d.Neighborhood;	//	Create a Neighborhood index field
+					axisLabels.Neighborhood[d.Neighborhood_Idx] = d.Neighborhood;	// Populate the Neighborhood axis labels
+					d.VotingPrecinct_Idx = +d.VotingPrecinct;	// Create a voting precinct index field
+					axisLabels.VotingPrecinct[d.VotingPrecinct_Idx] = "Pct " + d.VotingPrecinct;	// Populate the voting axis labels
+					axisLabels.PSA[+d.PSA_Idx] = d.PSA;	//	Populate the PSA axis labels
+					d.District_Idx = +d.District - 1;	//	Create a district index field
+					axisLabels.District[d.District_Idx] = "Dist " + d.District;	//	Populate the district axis labels
+					d.Month_Idx = +d.Month - 1;	//	Create a month index field
+					d.Weekday_Idx = +d.Weekday - 1;	//	Create a weekday index field
+					d.Hour_Idx = +d.Hour;	//	Create a hour index field
+					d.Day_Idx = +d.Day - 1;	//	Create a day index field
 					
-					dataCrime.push(d);
+					dataCrime.push(d);	//	Push our modified record to the global array so we can access it after the file loads
 				});
+				
+				//	To indicate that the file has loaded, we display the # of records processed
 				dataCount.html(data.length + " records loaded from file <a href='" + dataFile + "'>" + dataFile + "</a>");
+				
+				//	Display the default heat map
 				BuildHeatmap();
 			});
 			
-			
+			//	This function builds a heatmap from the two user-selected fields
 			function BuildHeatmap() {
-				//	Remove the existing SVG heatmap
+				//	Remove the existing SVG heatmap (we had problems trying to modify the existing one)
 				d3.select(".heatmap-svg").remove();
 				
 				//	Add a new heatmap SVG
@@ -244,9 +311,8 @@
 				//	Get the field names for the x and y axes
 				XField = document.getElementById("selXAxis").value;
 				YField = document.getElementById("selYAxis").value;
-				
-				
-				//	Calculate the number of tiles
+								
+				//	Calculate the number of tiles for every combination of these two fields
 				var numXVals = d3.map(dataCrime, function(d) { return d[XField]; }).size();
 				var numYVals = d3.map(dataCrime, function(d) { return d[YField]; }).size();
 				
@@ -255,14 +321,16 @@
 				var tileHeight = Math.floor(heatHeight / numYVals);
 
 				//	Group the data by the selected fields, and count the number of crimes
-				summaryData = d3.nest()
+				tileData = d3.nest()
 						.key(function(d) {return d[XField + "_Idx"] + ":" + d[YField + "_Idx"];})
 						.rollup(function (v) {return v.length;})
 						.entries(dataCrime)
 					;
-				var maxCrimes = d3.max(summaryData, function(d){return d.value;});
+					
+				//	Save the max value to use in scaling operations
+				var maxCrimes = d3.max(tileData, function(d){return d.value;});
 				
-				//	Calculate the counts of offense type
+				//	Calculate the counts by offense type for each heatmap tile (this will be used in the bar chart display)
 				crimeCounts = d3.nest()
 						.key(function(d) {return d[XField + "_Idx"] + ":" + d[YField + "_Idx"];})
 						.key(function(d) {return d.Offense_Idx;})
@@ -276,24 +344,24 @@
 					.range(["#000000","#0000FF","#00FFFF","#00FF00","#FFFF00","#FF0000","#FF00FF","#FFFFFF"]);
 
 				//	Generate tiles
-				//var tiles = heatmap.selectAll("rect")
 				heatmap.selectAll("rect")
-					.data(summaryData)
+					.data(tileData)
 					.enter()
 					.append("rect")
 						.attr("x", function(d){return (+d.key.split(":")[0]) * tileWidth;})
 						.attr("y", function(d){return ((+d.key.split(":")[1]) * tileHeight) + hmMargin.top;})
-						.attr("class","tile")
 						.attr("width", tileWidth)
 						.attr("height", tileHeight)
 						.style("fill",function(d) {return colorScale(d.value);})
-						.on("mouseover",function(d) {d3.select(this).style("stroke","#000000").style("stroke-width",3); CrimeDistribution(d.key);})
-						.on("mouseout",function(d) {d3.select(this).style("stroke","none");})
+						.attr("class","tile")
+						.on("mouseover",function(d) {if (!ItemSelected) {d3.select(this).style("stroke","#000000").style("stroke-width",3); CrimeDistribution(d.key);}})
+						.on("mouseout",function(d) {if (!ItemSelected) {d3.select(this).style("stroke","none");}})
 						.on("click",function(d) {HeatmapSelection(d.key);})
 						.append("title")
 							.text(function(d){return axisLabels[XField][+d.key.split(":")[0]] + " / " + axisLabels[YField][+d.key.split(":")[1]] + " = " + d.value;})
 					;
 				
+				//	Write the X-axis labels based on the selected field
 				var xLabels = heatmap.selectAll(".xLabel")
 					.data(axisLabels[XField])
 					.enter()
@@ -305,37 +373,42 @@
 						.attr("class","xLabel")
 				;
 				
+				//	Write the Y-axis labels based on the selected field
 				var yLabels = heatmap.selectAll(".yLabel")
 					.data(axisLabels[YField])
 					.enter()
 					.append("text")
 						.text(function(d) {return d;})
 						.attr("x", heatWidth + hmMargin.right - 5)
-						.attr("y", function(d,i) {return hmMargin.top + (i * tileHeight) + (tileHeight / 2);})
+						.attr("y", function(d,i) {return hmMargin.top + (i * tileHeight) + (tileHeight / 2) + 5;})
 						.style("text-anchor","end")
 						.attr("class","yLabel")
 				;
 			}
 			
+			//	This function builds the bar chart based on the distribution of crime types in the current heatmap tile
 			function CrimeDistribution(xsKey) {
-				var paIdx = xsKey.split(":");
-				var pnTotal = summaryData.filter(function(d) {return d.key == xsKey;})[0].value;
-				var paCrimes = crimeCounts.filter(function(d) {return d.key == xsKey;})[0];
+				var pnTotal = tileData.filter(function(d) {return d.key == xsKey;})[0].value;	//	The total number of crimes committed; used to calculate percentages
+				var paCrimes = crimeCounts.filter(function(d) {return d.key == xsKey;})[0];		//	Find the record that matches the key of the selected heatmap tile
 				
+				//	Remove the bars and crime counts
 				barChart.selectAll("rect").remove();
 				barChart.selectAll("text.barCount").remove();
 				
+				//	Generate bars for each crime type, and size them based on their percentage of the total crimes
 				barChart.selectAll("rect")
 					.data(paCrimes.values)
 					.enter()
 					.append("rect")
 						.attr("x", function(d,i) {return (+d.key * barWidth) + brMargin.left + (0.05 * barWidth); })
-						.attr("y", function(d,i) {return statsHeight - ((d.value / pnTotal) * statsHeight);})
-						.attr("width", 0.9 * barWidth)
+						.attr("y", function(d,i) {return statsHeight - ((d.value / pnTotal) * statsHeight);})	// Shifts the bar down to sit at the bottom
+						.attr("width", 0.9 * barWidth)	//	Gives a little space between bars
 						.attr("height",function(d,i) {return (d.value / pnTotal) * statsHeight;})
 						.attr("fill",function(d){return crimeColor[+d.key];})
 						.attr("class","crimeBar")
 				;
+				
+				//	Display the actual count for each crime
 				barChart.selectAll("text.barCount")
 					.data(paCrimes.values)
 					.enter()
@@ -344,12 +417,52 @@
 						.attr("x",function(d,i){return (+d.key * barWidth) + brMargin.left + (barWidth / 2);} )
 						.attr("y",statsHeight - 5)
 						.style("text-anchor","middle")
-						.attr("fill",function(d,i){return +d.key <= 1?"#FFFFFF":"#000000";})
+						.attr("fill",function(d,i){return +d.key <= 1?"#FFFFFF":"#000000";})	// Make the purple and blue label white to see it better
 						.attr("class","barCount")
 				;
 			}
 			
-			function HeatmapSelection(xsKey){}
+			//	This function responds to the user clicking on a heatmap tile
+			function HeatmapSelection(xsKey){
+				//	Remove all previous geo markers and stats
+				geoMap.selectAll(".geo-marker").remove();
+				statsInfo.html("");
+				
+				//	Toggle the selected state
+				ItemSelected = !ItemSelected;
+				
+				if (ItemSelected) {
+					//	Use the key of the selected tile to find the records that match the user-selected fields
+					var paIdx = xsKey.split(":");
+					var poCrimes = dataCrime.filter(function(d) {return d[XField + "_Idx"] == paIdx[0] && d[YField + "_Idx"] == paIdx[1];});
+					
+					//	Add markers for each crime
+					geoMap.selectAll(".geo-marker")
+						.data(poCrimes)
+						.enter()
+						.append("circle")
+							.attr("cx",function(d){return mapXScale(+d.Longitude);})
+							.attr("cy",function(d){return mapYScale(+d.Latitude);})
+							.attr("r",10)
+							.attr("fill",function(d){return crimeColor[+d.Offense_Idx];})
+							.attr("class","geo-marker")
+							.on("mouseover",function(d) {d3.select(this).style("stroke","#000000").style("stroke-width",2);})
+							.on("mouseout",function(d) {d3.select(this).style("stroke","none");})
+							.on("click",function(d) {CrimeDetails(d);})
+					;
+				}
+			}
+			
+			//	This function displays details of the crime when the user clicks on a geo-marker
+			function CrimeDetails(xoCCN) {
+				statsInfo.html("<h4>CCN: " + xoCCN.CCN + "</h4><br>"
+					+ "Offense: " + xoCCN.Offense + (xoCCN.Method_Idx > 0 ? " (" + xoCCN.Method + ")": "") + " [" + xoCCN.Type + "]<br>"
+					+ "Period: " + xoCCN.DateStart + " - " + xoCCN.DateEnd + " (" + xoCCN.CrimePeriod / 60.0 + " min)<br>"
+					+ "Reported: " + xoCCN.Reported + " (" + xoCCN.TIME_TO_REPORT / 60.0 + " min): " + xoCCN.Shift + " Shift, PSA: " + xoCCN.PSA + "<br>"
+					+ "<hr>"
+					+ "Political Ward: " + xoCCN.Ward + "; ANC: " + xoCCN.ANC + "; Voting Precinct: " + xoCCN.VotingPrecinct
+				);
+			}
 			
 		</script>
 	</body>
