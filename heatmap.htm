@@ -50,6 +50,13 @@
 				colorStops = ["#000000","#0000FF","#00FFFF","#00FF00","#FFFF00","#FF0000","#FF00FF","#FFFFFF"]
 				;
 				
+			var axisLabels = {
+				Hour: ["00","01","02","03","04","05","06","07","08","09","10","11","12","13","14","15","16","17","18","19","20","21","22","23"],
+				Weekday: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
+				Month: ["Jan","Feb", "Mar", "Apr", "May", "Jun","Jul","Aug","Sep","Oct","Nov","Dec"],
+				Crime: ["Theft","Theft f/Auto","Burglary","Assault","Robbery","Vehicle Theft","Homicide","Sex Abuse","Arson"]
+			};
+				
 			var heatmap = d3.select("#divHeatMap").append("svg")
 				.attr("width", hmProperties.right)
 				.attr("height",hmProperties.bottom)
@@ -57,6 +64,7 @@
 				.attr("transform","translate(" + hmProperties.margin.left + "," + hmProperties.margin.top + ")")
 				;
 			
+			/*
 			var dayLabels = heatmap.selectAll(".day-label")
 				.data(dayLbl)
 				.enter()
@@ -80,17 +88,45 @@
 					.attr("transform","translate(" + hmProperties.tile.width / 2 + ",0)")
 					.attr("class","time-label")
 				;
+			*/
+			
+			var prepHeatmap = function(xsFile, xsXField, xsYField)  {
+				hmProperties.tile.height = Math.floor(hmProperties.height / axisLabels[xsYField].length);
+				hmProperties.tile.width = Math.floor(hmProperties.width / axisLabels[xsXField].length);
 				
-			var prepHeatmap = function(xsFile)  {
-				
+				var yLabels = heatmap.selectAll(".y-axis")
+					.data(axisLabels[xsYField])
+					.enter()
+					.append("text")
+						.text(function(d){return d;})
+						.attr("x",hmProperties.right)
+						.attr("y",function(d,i){return (i+1) * hmProperties.tile.height;})
+						.style("text-anchor","end")
+						.attr("transform","translate(-5," + hmProperties.tile.height / 1.5 + ")")
+						.attr("class","y-axis")
+					;
+					
+				var xLabels = heatmap.selectAll(".x-axis")
+					.data(axisLabels[xsXField])
+					.enter()
+					.append("text")
+						.text(function(d){return d;})
+						.attr("x",function(d,i){return i * hmProperties.tile.width;})
+						.attr("y",0)
+						.style("text-anchor","middle")
+						.attr("transform","translate(" + hmProperties.tile.width / 2 + ",0)")
+						.attr("class","x-axis")
+					;
+						
 				d3.csv(xsFile,
 					function(d) {
 						return {
 							ccn: +d.CCN,
-							day: +d.Weekday,
+							day: +d.Weekday - 1,
 							hour: +d.Hour,
-							offense: +d.OFFENSE_Code,
-							id: d.Hour + ":" + d.Weekday,
+							month: +d.Month - 1,
+							offense: +d.OFFENSE_Code - 1,
+							id: d[xsXField] + ":" + d[xsYField],
 							
 						};
 					},
@@ -112,8 +148,8 @@
 						}
 
 						var colorScale = d3.scale.linear()
-							.domain([0,d3.max(summaryData,function(d){return d.values;})])
-							.range(16777216);
+							.domain([0,maxCrimes/7,maxCrimes*2/7,maxCrimes*3/7,maxCrimes*4/7,maxCrimes*5/7,maxCrimes*6/7,maxCrimes])
+							.range(["#000000","#0000FF","#00FFFF","#00FF00","#FFFF00","#FF0000","#FF00FF","#FFFFFF"]);
 						
 						var tiles = heatmap.selectAll(".tile")
 							.data(tileData)
@@ -124,7 +160,7 @@
 							.attr("class","tile")
 							.attr("width", hmProperties.tile.width)
 							.attr("height", hmProperties.tile.height)
-							.style("fill",function(d) {return colorScale8(d.count,maxCrimes);})
+							.style("fill",function(d) {return colorScale(d.count);})
 							.append("title")
 								.text(function(d){return dayLbl[d.day - 1] + " @ " + hrLbl[d.hour] + ":00 = " + d.count;})
 							;
@@ -132,6 +168,12 @@
 				);
 			};
 			
+		
+			function colorByCount(xdMaxValue) {
+				return d3.scale.linear()
+					.domain([0,xdMaxValue/7,xdMaxValue*2/7,xdMaxValue*3/7,xdMaxValue*4/7,xdMaxValue*5/7,xdMaxValue*6/7,xdMaxValue])
+					.range(["#000000","#0000FF","#00FFFF","#00FF00","#FFFF00","#FF0000","#FF00FF","#FFFFFF"]);
+			}
 			function colorScale8(xdValue, xdMax) {
 				var pdPct = (xdValue / xdMax);
 				pnColorMax = 1791;
@@ -167,7 +209,7 @@
 			}
 
 			
-			prepHeatmap("DC_Crime_2015_Lab2.csv");
+			prepHeatmap("DC_Crime_2015_Lab2.csv","Weekday","Month");
 		</script>
 	</body>
 </html>

@@ -267,17 +267,23 @@
 			*/
 			d3.csv(dataFile, function(data){
 				data.forEach(function(d){
-					axisLabels.Shift[+d.Shift_Idx] = d.Shift;	//	Populate the Shift axis labels with the shift names matching the indices
+					d.Shift_Idx = +d.Shift_Idx - 1;
+					axisLabels.Shift[d.Shift_Idx] = d.Shift;	//	Populate the Shift axis labels with the shift names matching the indices
 					//axisLabels.Offense[+d.Offense_Idx] = d.Offense;
+					d.Offense_Idx = +d.Offense_Idx - 1;
+					d.Method_Idx = +d.Method_Idx - 1;
 					axisLabels.Method[+d.Method_Idx] = d.Method;	//	Populate the Method axis labels with the named methods
+					d.Type_Idx = +d.Type_Idx - 1;
 					axisLabels.Type[+d.Type_Idx] = d.Type;		//	Populate the Type axis labels
 					d.Ward_Idx = +d.Ward - 1;	//	Create a Ward index field from the Ward ID
 					axisLabels.Ward[d.Ward_Idx] = "Ward " + d.Ward;	//	Populate the Ward axis labels
+					d.ANC_Idx = +d.ANC_Idx - 1;
 					axisLabels.ANC[+d.ANC_Idx] = d.ANC;	//	Populate the ANC axis labels
 					d.Neighborhood_Idx = +d.Neighborhood;	//	Create a Neighborhood index field
 					axisLabels.Neighborhood[d.Neighborhood_Idx] = d.Neighborhood;	// Populate the Neighborhood axis labels
 					d.VotingPrecinct_Idx = +d.VotingPrecinct;	// Create a voting precinct index field
 					axisLabels.VotingPrecinct[d.VotingPrecinct_Idx] = "Pct " + d.VotingPrecinct;	// Populate the voting axis labels
+					d.PSA_Idx = +d.PSA_Idx - 1;
 					axisLabels.PSA[+d.PSA_Idx] = d.PSA;	//	Populate the PSA axis labels
 					d.District_Idx = +d.District - 1;	//	Create a district index field
 					axisLabels.District[d.District_Idx] = "Dist " + d.District;	//	Populate the district axis labels
@@ -341,7 +347,7 @@
 				//	Adjust the color scale based on the max number of crimes
 				var colorScale = d3.scaleLinear()
 					.domain([0,maxCrimes/7,maxCrimes*2/7,maxCrimes*3/7,maxCrimes*4/7,maxCrimes*5/7,maxCrimes*6/7,maxCrimes])
-					.range(["#000000","#0000FF","#00FFFF","#00FF00","#FFFF00","#FF0000","#FF00FF","#FFFFFF"]);
+					.range(["#8844FF","#0000FF","#00FFFF","#00FF00","#FFFF00","#FF0000","#FF00FF","#FFFFFF"]);
 
 				//	Generate tiles
 				heatmap.selectAll("rect")
