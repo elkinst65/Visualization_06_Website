@@ -464,7 +464,7 @@
 				statsInfo.html("<h4>CCN: " + xoCCN.CCN + "</h4><br>"
 					+ "Offense: " + xoCCN.Offense + (xoCCN.Method_Idx > 0 ? " (" + xoCCN.Method + ")": "") + " [" + xoCCN.Type + "]<br>"
 					+ "Period: " + xoCCN.DateStart + " - " + xoCCN.DateEnd + " (" + xoCCN.CrimePeriod / 60.0 + " min)<br>"
-					+ "Reported: " + xoCCN.Reported + " (" + xoCCN.TIME_TO_REPORT / 60.0 + " min): " + xoCCN.Shift + " Shift, PSA: " + xoCCN.PSA + "<br>"
+					+ "Reported: " + xoCCN.Reported + " (" + +xoCCN.TimeToReport / 60.0 + " min): " + xoCCN.Shift + " Shift, PSA: " + xoCCN.PSA + "<br>"
 					+ "<hr>"
 					+ "Political Ward: " + xoCCN.Ward + "; ANC: " + xoCCN.ANC + "; Voting Precinct: " + xoCCN.VotingPrecinct
 				);
