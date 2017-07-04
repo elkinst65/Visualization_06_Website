@@ -334,6 +334,8 @@
 			function BuildHeatmap() {
 				//	Remove the existing SVG heatmap (we had problems trying to modify the existing one)
 				d3.select(".heatmap-svg").remove();
+				ItemSelected = false;
+				ClearGeoMarkers();
 				
 				//	Add a new heatmap SVG
 				heatmap = d3.select("#divHeatmap").append("svg")
@@ -420,6 +422,12 @@
 				;
 			}
 			
+			function ClearGeoMarkers() {
+				geoMap.selectAll(".geo-marker").remove();
+				geoLabel.style("display","none");
+				statsInfo.html("");
+			}
+			
 			//	This function builds the bar chart based on the distribution of crime types in the current heatmap tile
 			function CrimeDistribution(xsKey) {
 				var pnTotal = tileData.filter(function(d) {return d.key == xsKey;})[0].value;	//	The total number of crimes committed; used to calculate percentages
@@ -459,9 +467,7 @@
 			//	This function responds to the user clicking on a heatmap tile
 			function HeatmapSelection(xsKey){
 				//	Remove all previous geo markers and stats
-				geoMap.selectAll(".geo-marker").remove();
-				geoLabel.style("display","none");
-				statsInfo.html("");
+				ClearGeoMarkers();
 				
 				//	Toggle the selected state
 				ItemSelected = !ItemSelected;
@@ -487,7 +493,7 @@
 					;
 					
 					geoLabel
-						.text("Showing crimes committed for " + XField + " = " + axisLabels[XField][paIdx[0]] + " and " + YField + " = " + axisLabels[YField][paIdx[1]])
+						.text("Showing " + poCrimes.length + " crimes committed with " + XField + " = " + axisLabels[XField][paIdx[0]] + " and " + YField + " = " + axisLabels[YField][paIdx[1]])
 						.style("display","inline");
 				}
 			}
