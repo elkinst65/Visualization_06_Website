@@ -1,0 +1,103 @@
+<!-- 
+
+    @authors
+    Ben Brock
+    Tom Elkins
+    Austin Kelly
+
+    Create a Voronoi Polygon Graph
+
+   
+    Randomly select vertices to build a voronoi polygon using the power of 
+    d3 function voronoi.polygons() function.
+
+    The nice-a-ty of this porject, we have build in the capability where the 
+    user can resize the window and the area is automatically resized accordingly
+    by the width and height calls.
+
+    hover events
+    color the area indicated listed in the css g.polygons path.hover
+
+    Here we are using d3.js and d3plus.js libraries to create the graph for the 
+    3d skill visualization.   Rather than try to recreate the work from scratch, we
+    are leveraging the work done by the d3plus.org/js/d3.js and 
+    d3plus.org/js/d3plus.js libraries.   Our goal was to gain confidence in using 
+    the libraries to create some nice outputs without doing much coding.
+
+    Here you must understand how to use the d3.js && d3plus.js libraries to your
+    advantage.  This is a lot like object oriented programming, where you have to 
+    know what you are trying to do before doing it.  Then check the libraries to 
+    see if this functionality is already done.  There is no need to recreate the 
+    wheel!!!!
+
+    References:
+    http://codeactually.com/d3.html
+    https://bost.ocks.org/mike/selection/
+    https://d3js.org/
+    https://bl.ocks.org/mbostock/3808218
+-->
+
+
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+    <title>D3 V4 Voronoi Project 6 Data Viz II</title>
+		<link rel="stylesheet" type="text/css" href="style.css" >
+		<script type="text/javascript" src="d3.v4.js"></script>
+    <style>
+    g.polygons path {
+      fill: white;
+      stroke: lightsteelblue;
+    }
+
+		g.polygons path:hover {
+			fill: blue;
+		}
+
+    g.fuel circle {
+      fill: steelblue;
+    }
+
+    </style>
+
+	</head>
+
+	<body>
+		<script type="text/javascript">
+d3.select(window).on("resize",callFunction);
+callFunction();
+function callFunction() {
+
+			var svgtest = d3.select("body").select("svg");
+			if (!svgtest.empty()) {
+				svgtest.remove();
+			}
+
+      var width = window.innerWidth||document.documentElement.clientWidth||document.body.clientWidth;
+      var height = window.innerHeight||document.documentElement.clientHeight||document.body.clientHeight;
+
+      var vertices = d3.range(100).map(function(d){ return [Math.random()*width,Math.random()*height]; });
+
+      var voronoi = d3.voronoi().size([width,height]);
+      var svg = d3.select("body").append("svg").attr("width","100%").attr("height","100%");
+
+      svg.append("g").attr("class","polygons")
+      .selectAll("path")
+        .data(voronoi.polygons(vertices))
+        .enter().append("path")
+                  .attr("d",function(d){ return "M"+d.join("L")+"Z"; });
+
+      svg.append("g").attr("class","fuel")
+      .selectAll("circle")
+        .data(vertices)
+        .enter().append("circle")
+                  .attr("cx",function(d){ return d[0]; })
+                  .attr("cy",function(d){ return d[1]; })
+                  .attr("r","2.5");
+
+}
+    </script>
+  </body>
+
+</html>
