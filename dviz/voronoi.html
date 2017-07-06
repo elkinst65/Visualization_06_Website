@@ -7,13 +7,18 @@
 
     Create a Voronoi Polygon Graph
 
-   
     Randomly select vertices to build a voronoi polygon using the power of 
     d3 function voronoi.polygons() function.
 
-    The nice-a-ty of this porject, we have build in the capability where the 
-    user can resize the window and the area is automatically resized accordingly
-    by the width and height calls.
+    The nice-a-ty of this project, we have built in the capability where the 
+    user can resize the window's width and height and the area is automatically 
+    resized accordingly by the width and height calls.  All of this is done 
+    within the callfunction() method.  This is an elegant way to put a facade
+    around your automatically resizing your application by using the resizing 
+    pattern.
+
+    Our group followed a well known window resizing pattern used in the 
+    window graphic community.
 
     hover events
     color the area indicated listed in the css g.polygons path.hover
@@ -52,7 +57,7 @@
     }
 
 		g.polygons path:hover {
-			fill: blue;
+			fill: darkgreen;
 		}
 
     g.fuel circle {
@@ -64,9 +69,14 @@
 	</head>
 
 	<body>
-		<script type="text/javascript">
-d3.select(window).on("resize",callFunction);
+		<script type="text/javascript"> 
+
+// the main hook for dynamically starting the resizing process
+// within d3
+d3.select(window).on("resize", callFunction);
+
 callFunction();
+
 function callFunction() {
 
 			var svgtest = d3.select("body").select("svg");
@@ -74,27 +84,44 @@ function callFunction() {
 				svgtest.remove();
 			}
 
-      var width = window.innerWidth||document.documentElement.clientWidth||document.body.clientWidth;
-      var height = window.innerHeight||document.documentElement.clientHeight||document.body.clientHeight;
+      // here we are dynamically setting the size of the application's width and
+      // height.
+      //
+      // make this compatible with all types of browsers
+      // firefox, ie, google chrome, and many other browsers
+      var width =  window.innerWidth || 
+                   document.documentElement.clientWidth ||
+                   document.body.clientWidth;
 
-      var vertices = d3.range(100).map(function(d){ return [Math.random()*width,Math.random()*height]; });
+      var height = window.innerHeight ||
+                   document.documentElement.clientHeight ||
+                   document.body.clientHeight;
 
+      // randomly select the vertices
+      var vertices = d3.range(100)
+                       .map(function(d){ return [Math.random()*width,Math.random()*height]; });
+
+      // dynamically obtain the width and height
       var voronoi = d3.voronoi().size([width,height]);
-      var svg = d3.select("body").append("svg").attr("width","100%").attr("height","100%");
+      var svg = d3.select("body")
+                  .append("svg")
+                  .attr("width","100%")
+                  .attr("height","100%");
 
+      // build the voronoi graph with polygons
       svg.append("g").attr("class","polygons")
-      .selectAll("path")
+        .selectAll("path")
         .data(voronoi.polygons(vertices))
         .enter().append("path")
-                  .attr("d",function(d){ return "M"+d.join("L")+"Z"; });
+        .attr("d",function(d){ return "M"+d.join("L")+"Z"; });
 
       svg.append("g").attr("class","fuel")
-      .selectAll("circle")
+        .selectAll("circle")
         .data(vertices)
         .enter().append("circle")
-                  .attr("cx",function(d){ return d[0]; })
-                  .attr("cy",function(d){ return d[1]; })
-                  .attr("r","2.5");
+        .attr("cx",function(d){ return d[0]; })
+        .attr("cy",function(d){ return d[1]; })
+        .attr("r","2.5");
 
 }
     </script>
